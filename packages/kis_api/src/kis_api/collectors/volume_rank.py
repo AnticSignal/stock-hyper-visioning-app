@@ -5,13 +5,13 @@ from typing import Any, List, Mapping, Optional
 
 from ..client import KISClient, KST
 
-__all__ = ["fetch_volume_rank_top30"]
+__all__ = ["fetch_volume_rank"]
 
 API_PATH = "/uapi/domestic-stock/v1/quotations/volume-rank"
 TR_ID_VOLUME_RANK = "FHPST01710000"
 
 
-def fetch_volume_rank_top30(
+def fetch_volume_rank(
     client: KISClient,
     *,
     fid_cond_mrkt_div_code: str = "J",
