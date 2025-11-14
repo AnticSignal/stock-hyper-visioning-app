@@ -7,5 +7,6 @@ Azure Functions, 백엔드 서비스 등에서 동일 로직을 재사용하려�
 
 from .client import KISClient
 from .collectors.volume_rank import fetch_volume_rank
+from .collectors.investor_trade_by_stock_daily import fetch_investor_trade_by_stock_daily
 
-__all__ = ["KISClient", "fetch_volume_rank"]
+__all__ = ["KISClient", "fetch_volume_rank", "fetch_investor_trade_by_stock_daily"]

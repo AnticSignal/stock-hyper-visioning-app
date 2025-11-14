@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, List, Mapping, Optional
+
+from ..client import KISClient, KST
+
+__all__ = ["fetch_investor_trade_by_stock_daily"]
+
+API_PATH = "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily"  # api에 맞게 수정
+TR_ID_VOLUME_RANK = "FHPTJ04160001"                  # api에 맞게 수정
+METHOD = "GET"
+CUSTTYPE = "P"
+
+def fetch_investor_trade_by_stock_daily(
+    client: KISClient,
+    fid_input_iscd: str,
+    fid_input_date: str, # YYYYMMDD 
+    *,
+    fid_cond_mrkt_div_code: str = "J",
+) -> List[Mapping[str, Any]]:
+    """Call the volume-rank API and return the enriched payload."""
+    params = {
+        "FID_COND_MRKT_DIV_CODE": fid_cond_mrkt_div_code,
+        "FID_INPUT_ISCD": fid_input_iscd,
+        "FID_INPUT_DATE_1": fid_input_date,
+        "FID_ORG_ADJ_PRC": "",
+        "FID_ETC_CLS_CODE": "",
+    }
+
+    response = client.request(
+        METHOD,
+        API_PATH,
+        params=params,
+        headers={"tr_id": TR_ID_VOLUME_RANK, "custtype": CUSTTYPE},
+    )
+
+    collected_at = datetime.now(KST).replace(second=0, microsecond=0)
+    enriched: List[Mapping[str, Any]] = []
+    for item in response.get("output", []):
+        enriched.append(
+            {
+                "rt_cd": response.get("rt_cd"),
+                "msg_cd": response.get("msg_cd"),
+                "msg1": response.get("msg1"),
+                "collected_at": collected_at,
+                **item,
+            }
+        )
+    return enriched
