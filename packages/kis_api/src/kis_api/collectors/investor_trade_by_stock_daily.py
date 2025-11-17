@@ -8,14 +8,15 @@ from ..client import KISClient, KST
 __all__ = ["fetch_investor_trade_by_stock_daily"]
 
 API_PATH = "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily"  # api에 맞게 수정
-TR_ID = "FHPTJ04160001"                  # api에 맞게 수정
+TR_ID = "FHPTJ04160001"  # api에 맞게 수정
 METHOD = "GET"
 CUSTTYPE = "P"
+
 
 def fetch_investor_trade_by_stock_daily(
     client: KISClient,
     fid_input_iscd: str,
-    fid_input_date: str, # YYYYMMDD 
+    fid_input_date: str,  # YYYYMMDD
     *,
     fid_cond_mrkt_div_code: str = "J",
 ) -> List[Mapping[str, Any]]:
@@ -37,14 +38,14 @@ def fetch_investor_trade_by_stock_daily(
 
     collected_at = datetime.now(KST).replace(second=0, microsecond=0)
     enriched: List[Mapping[str, Any]] = []
-    for item in response.get("output", []):
-        enriched.append(
-            {
-                "rt_cd": response.get("rt_cd"),
-                "msg_cd": response.get("msg_cd"),
-                "msg1": response.get("msg1"),
-                "collected_at": collected_at,
-                **item,
-            }
-        )
+    item = response.get("output2", [])[0]
+    enriched.append(
+        {
+            "rt_cd": response.get("rt_cd"),
+            "msg_cd": response.get("msg_cd"),
+            "msg1": response.get("msg1"),
+            "collected_at": collected_at,
+            **item,
+        }
+    )
     return enriched
