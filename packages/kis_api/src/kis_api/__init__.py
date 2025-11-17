@@ -8,6 +8,8 @@ Azure Functions, 백엔드 서비스 등에서 동일 로직을 재사용하려�
 from .client import KISClient
 # 국내업종현재지수_API collector -> inquire-index-price
 from .collectors.inquire_index_price import fetch_inquire_index_price
+# 국내주식기간별시세 API collector -> inquire-daily-itemchartprice
+from .collectors.inquire_daily_itemchartprice import fetch_inquire_daily_itemchartprice
 # 종목별 투자자매매동향(일별) collector -> investor-trade-by-stock-daily
 from .collectors.investor_trade_by_stock_daily import fetch_investor_trade_by_stock_daily
 # 주식현재가시세_API collector -> inquire-price
@@ -19,6 +21,7 @@ from .collectors.volume_rank import fetch_volume_rank
 
 __all__ = [
     "KISClient",
+    "fetch_inquire_daily_itemchartprice",
     "fetch_inquire_index_price",
     "fetch_investor_trade_by_stock_daily",
     "fetch_inquire_price",
