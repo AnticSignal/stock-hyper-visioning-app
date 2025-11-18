@@ -8,7 +8,7 @@ from ..client import KISClient, KST
 __all__ = ["fetch_investor_trade_by_stock_daily"]
 
 API_PATH = "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily"  # api에 맞게 수정
-TR_ID_VOLUME_RANK = "FHPTJ04160001"                  # api에 맞게 수정
+TR_ID = "FHPTJ04160001"                  # api에 맞게 수정
 METHOD = "GET"
 CUSTTYPE = "P"
 
@@ -32,7 +32,7 @@ def fetch_investor_trade_by_stock_daily(
         METHOD,
         API_PATH,
         params=params,
-        headers={"tr_id": TR_ID_VOLUME_RANK, "custtype": CUSTTYPE},
+        headers={"tr_id": TR_ID, "custtype": CUSTTYPE},
     )
 
     collected_at = datetime.now(KST).replace(second=0, microsecond=0)

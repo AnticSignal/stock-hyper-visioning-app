@@ -9,7 +9,8 @@ __all__ = ["fetch_volume_rank"]
 
 API_PATH = "/uapi/domestic-stock/v1/quotations/volume-rank"
 TR_ID_VOLUME_RANK = "FHPST01710000"
-
+METHOD = "GET"
+CUSTTYPE = "P"
 
 def fetch_volume_rank(
     client: KISClient,
@@ -42,10 +43,10 @@ def fetch_volume_rank(
     }
 
     response = client.request(
-        "get",
+        METHOD,
         API_PATH,
         params=params,
-        headers={"tr_id": TR_ID_VOLUME_RANK},
+        headers={"tr_id": TR_ID_VOLUME_RANK, "custtype": CUSTTYPE},
     )
 
     collected_at = datetime.now(KST).replace(second=0, microsecond=0)
