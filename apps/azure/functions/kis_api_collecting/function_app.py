@@ -1,9 +1,9 @@
-
 import json
 import logging
 import os
 from collections import defaultdict
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import azure.functions as func
@@ -38,7 +38,10 @@ def _build_volume_rank_schedule() -> str:
     try:
         interval = max(1, int(raw_value))
     except ValueError:
-        logging.warning("VOLUME_RANK_PULLING_INTERVAL=%s 값이 잘못되어 300초로 대체합니다.", raw_value)
+        logging.warning(
+            "VOLUME_RANK_PULLING_INTERVAL=%s 값이 잘못되어 300초로 대체합니다.",
+            raw_value,
+        )
         interval = 300
 
     if interval < 60:
@@ -52,7 +55,9 @@ def _build_volume_rank_schedule() -> str:
     if seconds == 0 and minutes == 0 and hours < 24:
         return f"0 0 */{hours} * * *"
 
-    logging.warning("지원하지 않는 interval=%s 값이 입력되어 5분 주기로 대체합니다.", interval)
+    logging.warning(
+        "지원하지 않는 interval=%s 값이 입력되어 5분 주기로 대체합니다.", interval
+    )
     return "0 */5 * * * *"
 
 
@@ -62,8 +67,8 @@ def _resolve_investor_trade_date() -> str:
 
 
 def _resolve_time_itemconclusion_hour() -> str:
-    """시간대별 체결 조회에서 사용할 기준 시각을 반환한다."""
-    return os.environ.get("TIME_ITEMCONCLUSION_DEFAULT_HOUR", "090000")
+    """시간대별 체결 조회에서 사용할 기준 시각을 (초 단위) 반환한다."""
+    return datetime.now(KST).strftime("%H%M%S")
 
 
 def _ensure_event_sequence(
@@ -89,11 +94,15 @@ def _extract_stock_codes(payload: str) -> List[str]:
 
     candidates: Iterable[str] = []
     if isinstance(data, list):
-        candidates = (item.get("mksc_shrn_iscd") for item in data if isinstance(item, dict))
+        candidates = (
+            item.get("mksc_shrn_iscd") for item in data if isinstance(item, dict)
+        )
     elif isinstance(data, dict):
         candidates = [data.get("mksc_shrn_iscd") or data.get("stck_shrn_iscd")]
     else:
-        logging.info("Unsupported payload type for extracting stock codes: %s", type(data))
+        logging.info(
+            "Unsupported payload type for extracting stock codes: %s", type(data)
+        )
         return []
 
     codes = [code for code in candidates if code]
@@ -104,7 +113,9 @@ def _get_int_env(key: str, default: int) -> int:
     try:
         return int(os.environ.get(key, default))
     except (TypeError, ValueError):
-        logging.warning("%s 값을 정수로 변환할 수 없어 기본값 %s을 사용합니다.", key, default)
+        logging.warning(
+            "%s 값을 정수로 변환할 수 없어 기본값 %s을 사용합니다.", key, default
+        )
         return default
 
 
@@ -116,7 +127,9 @@ def _get_redis_service() -> RedisService:
         port = _get_int_env("REDIS_PORT", 6380)
         password = os.environ.get("REDIS_PASSWORD")
         database = _get_int_env("REDIS_DB", 0)
-        _redis_service = RedisService(host=host, port=port, password=password, database=database)
+        _redis_service = RedisService(
+            host=host, port=port, password=password, database=database
+        )
         logging.info("Redis service initialized for %s:%s/%s", host, port, database)
     return _redis_service
 
@@ -133,14 +146,20 @@ def _get_psql_client() -> PsqlDBClient:
             minconn=_get_int_env("POSTGRES_MIN_CONN", 1),
             maxconn=_get_int_env("POSTGRES_MAX_CONN", 5),
         )
-        logging.info("PostgreSQL client initialized for %s/%s", os.environ["POSTGRES_HOST"], os.environ["POSTGRES_DB"])
+        logging.info(
+            "PostgreSQL client initialized for %s/%s",
+            os.environ["POSTGRES_HOST"],
+            os.environ["POSTGRES_DB"],
+        )
     return _psql_client
 
 
 def _get_daily_price_table() -> str:
     table = os.environ.get("DAILY_PRICE_TABLE_NAME", "stock_daily_prices")
     if not table or not all(ch.isalnum() or ch == "_" for ch in table):
-        raise ValueError("DAILY_PRICE_TABLE_NAME 환경 변수에는 영문/숫자/언더스코어만 사용할 수 있습니다.")
+        raise ValueError(
+            "DAILY_PRICE_TABLE_NAME 환경 변수에는 영문/숫자/언더스코어만 사용할 수 있습니다."
+        )
     return table
 
 
@@ -186,6 +205,17 @@ def _cache_time_itemconclusion(rows: List[Dict[str, Any]]) -> None:
         service.set(f"stock:{code}:intraday_ticks", json.dumps(items, default=str))
 
 
+def _safe_decimal(value: Any) -> Optional[Decimal]:
+    """문자열/숫자를 Decimal 로 변환한다."""
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        logging.warning("Cannot convert value=%s to Decimal", value)
+        return None
+
+
 def _persist_daily_chartprice(rows: List[Dict[str, Any]]) -> None:
     """기간별 시세 데이터를 PostgreSQL 테이블에 upsert한다."""
     if not rows:
@@ -193,9 +223,10 @@ def _persist_daily_chartprice(rows: List[Dict[str, Any]]) -> None:
     table_name = _get_daily_price_table()
     client = _get_psql_client()
     insert_sql = (
-        f"INSERT INTO {table_name} (stock_code, chart_date, payload) "
-        "VALUES (%s, %s, %s::jsonb) "
-        "ON CONFLICT (stock_code, chart_date) DO UPDATE SET payload = EXCLUDED.payload"
+        f"INSERT INTO {table_name} (fid_input_iscd, fid_period_div_code, stck_bsop_date, stck_clpr, stck_oprc) "
+        "VALUES (%s, %s, %s::date, %s, %s) "
+        "ON CONFLICT (fid_input_iscd, fid_period_div_code, stck_bsop_date) "
+        "DO UPDATE SET stck_clpr = EXCLUDED.stck_clpr, stck_oprc = EXCLUDED.stck_oprc"
     )
     inserted = 0
     with client.cursor() as cur:
@@ -206,9 +237,12 @@ def _persist_daily_chartprice(rows: List[Dict[str, Any]]) -> None:
                 or row.get("stck_shrn_iscd")
             )
             trade_date = row.get("stck_bsop_date")
-            if not code or not trade_date:
+            period_code = row.get("requested_fid_period_div_code")
+            close_price = _safe_decimal(row.get("stck_clpr"))
+            open_price = _safe_decimal(row.get("stck_oprc"))
+            if not code or not trade_date or not period_code or close_price is None or open_price is None:
                 continue
-            cur.execute(insert_sql, (code, trade_date, json.dumps(row, default=str)))
+            cur.execute(insert_sql, (code, period_code, trade_date, close_price, open_price))
             inserted += 1
     logging.info("Persisted %d chart price rows into %s", inserted, table_name)
 
@@ -216,35 +250,58 @@ def _persist_daily_chartprice(rows: List[Dict[str, Any]]) -> None:
 # Function 별 스케줄과 Event Hub를 환경 변수 기반으로 계산한다.
 VOLUME_RANK_SCHEDULE = _build_volume_rank_schedule()
 DEFAULT_EVENT_HUB_NAME = os.environ["AnticSignalEventHubName"]
+VOLUME_RANK_EVENT_HUB_NAME = os.environ.get(
+    "VolumeRankEventHubName", DEFAULT_EVENT_HUB_NAME
+)
+EVENT_HUB_CONSUMER_GROUP = os.environ.get(
+    "EventHubConsumerGroup", "$Default"
+)
 INVESTOR_TRADE_EVENT_HUB = os.environ.get(
     "INVESTOR_TRADE_EVENT_HUB_NAME", DEFAULT_EVENT_HUB_NAME
 )
 
 
-# 거래량 순위 데이터 
+# 거래량 순위 데이터
 @app.function_name(name="kis_volume_rank_collect_interval")
 @app.event_hub_output(
-    arg_name="kis_volume_rank",
+    arg_name="kis_volume_rank_default",
     event_hub_name=DEFAULT_EVENT_HUB_NAME,
     connection="AnticSignalEventConnectionString",
 )
-@app.timer_trigger(schedule=VOLUME_RANK_SCHEDULE, arg_name="myTimer", run_on_startup=True, use_monitor=False)
-def volume_rank_collect_interval(myTimer: func.TimerRequest, kis_volume_rank: func.Out[str]) -> None:  # type: ignore
+@app.event_hub_output(
+    arg_name="kis_volume_rank_interval",
+    event_hub_name=VOLUME_RANK_EVENT_HUB_NAME,
+    connection="AnticSignalEventConnectionString",
+)
+@app.timer_trigger(
+    schedule=VOLUME_RANK_SCHEDULE,
+    arg_name="myTimer",
+    run_on_startup=True,
+    use_monitor=False,
+)
+def volume_rank_collect_interval(
+    myTimer: func.TimerRequest,
+    kis_volume_rank_default: func.Out[str],
+    kis_volume_rank_interval: func.Out[str],
+) -> None:  # type: ignore
     """거래량 순위 데이터를 주기적으로 조회해 Event Hub로 전송한다."""
     if myTimer.past_due:
         logging.info("The timer is past due!")
 
     data = fetch_volume_rank(client)
-    kis_volume_rank.set(json.dumps(data, default=str))
+    payload = json.dumps(data, default=str)
+    kis_volume_rank_default.set(payload)
+    kis_volume_rank_interval.set(payload)
     logging.info("Volume rank timer function executed.")
 
 
+# 주식 현재가 시세
 @app.function_name(name="kis_inquire_price_from_event")
 @app.event_hub_message_trigger(
     arg_name="events",
-    event_hub_name=DEFAULT_EVENT_HUB_NAME,
+    event_hub_name=VOLUME_RANK_EVENT_HUB_NAME,
     connection="AnticSignalEventConnectionString",
-    consumer_group="$Default",
+    consumer_group=EVENT_HUB_CONSUMER_GROUP,
 )
 def inquire_price_from_event(events: Sequence[func.EventHubEvent]) -> None:  # type: ignore
     """거래량 순위 이벤트를 받아 종목 현재가를 실시간 조회하고 Redis에 저장한다."""
@@ -260,7 +317,9 @@ def inquire_price_from_event(events: Sequence[func.EventHubEvent]) -> None:  # t
         enriched_payloads = []
         for code in stock_codes:
             try:
-                enriched_payloads.append(fetch_inquire_price(client, fid_input_iscd=code))
+                enriched_payloads.append(
+                    fetch_inquire_price(client, fid_input_iscd=code)
+                )
             except Exception as exc:  # pylint: disable=broad-except
                 logging.exception("Failed to fetch current price for %s: %s", code, exc)
 
@@ -272,12 +331,13 @@ def inquire_price_from_event(events: Sequence[func.EventHubEvent]) -> None:  # t
         )
 
 
+# 당일 시간대별 체결
 @app.function_name(name="kis_inquire_time_itemconclusion_from_event")
 @app.event_hub_message_trigger(
     arg_name="events",
-    event_hub_name=DEFAULT_EVENT_HUB_NAME,
+    event_hub_name=VOLUME_RANK_EVENT_HUB_NAME,
     connection="AnticSignalEventConnectionString",
-    consumer_group="$Default",
+    consumer_group=EVENT_HUB_CONSUMER_GROUP,
 )
 def inquire_time_itemconclusion_from_event(events: Sequence[func.EventHubEvent]) -> None:  # type: ignore
     """Event Hub 메시지를 받아 당일 시간대별 체결 데이터를 조회하고 Redis에 저장한다."""
@@ -302,7 +362,9 @@ def inquire_time_itemconclusion_from_event(events: Sequence[func.EventHubEvent])
                     )
                 )
             except Exception as exc:  # pylint: disable=broad-except
-                logging.exception("Failed to fetch time conclusion for %s: %s", code, exc)
+                logging.exception(
+                    "Failed to fetch time conclusion for %s: %s", code, exc
+                )
 
         _cache_time_itemconclusion(aggregated)
         logging.info(
@@ -312,6 +374,7 @@ def inquire_time_itemconclusion_from_event(events: Sequence[func.EventHubEvent])
         )
 
 
+# 투자자 매매동향
 @app.function_name(name="kis_investor_trade_by_stock_daily_from_event")
 @app.event_hub_output(
     arg_name="investor_trade_output",
@@ -320,9 +383,9 @@ def inquire_time_itemconclusion_from_event(events: Sequence[func.EventHubEvent])
 )
 @app.event_hub_message_trigger(
     arg_name="events",
-    event_hub_name=DEFAULT_EVENT_HUB_NAME,
+    event_hub_name=VOLUME_RANK_EVENT_HUB_NAME,
     connection="AnticSignalEventConnectionString",
-    consumer_group="$Default",
+    consumer_group=EVENT_HUB_CONSUMER_GROUP,
 )
 def investor_trade_by_stock_daily_from_event(
     events: Sequence[func.EventHubEvent],
@@ -350,7 +413,9 @@ def investor_trade_by_stock_daily_from_event(
                     )
                 )
             except Exception as exc:  # pylint: disable=broad-except
-                logging.exception("Failed to fetch investor trade data for %s: %s", code, exc)
+                logging.exception(
+                    "Failed to fetch investor trade data for %s: %s", code, exc
+                )
 
         if aggregated:
             investor_trade_output.set(json.dumps(aggregated, default=str))
@@ -364,9 +429,9 @@ def investor_trade_by_stock_daily_from_event(
 @app.function_name(name="kis_inquire_daily_chartprice_from_event")
 @app.event_hub_message_trigger(
     arg_name="events",
-    event_hub_name=DEFAULT_EVENT_HUB_NAME,
+    event_hub_name=VOLUME_RANK_EVENT_HUB_NAME,
     connection="AnticSignalEventConnectionString",
-    consumer_group="$Default",
+    consumer_group=EVENT_HUB_CONSUMER_GROUP,
 )
 def inquire_daily_chartprice_from_event(events: Sequence[func.EventHubEvent]) -> None:  # type: ignore
     """Event Hub 메시지를 받아 1년치 시세 데이터를 조회하고 PostgreSQL에 저장한다."""
@@ -389,7 +454,9 @@ def inquire_daily_chartprice_from_event(events: Sequence[func.EventHubEvent]) ->
                     )
                 )
             except Exception as exc:  # pylint: disable=broad-except
-                logging.exception("Failed to fetch daily chart price for %s: %s", code, exc)
+                logging.exception(
+                    "Failed to fetch daily chart price for %s: %s", code, exc
+                )
 
         _persist_daily_chartprice(aggregated)
         logging.info(
