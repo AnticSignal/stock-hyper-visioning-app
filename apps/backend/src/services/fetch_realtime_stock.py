@@ -1,6 +1,7 @@
 """실시간 주식 데이터를 Redis에 접속하여 캐시합니다.
 """
 import json
+import pprint
 from typing import Optional
 from antic_extensions import RedisService
 from .schema_enums import (
