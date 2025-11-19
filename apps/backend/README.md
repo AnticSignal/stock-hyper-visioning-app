@@ -125,3 +125,9 @@ pip install .
 cd ./src
 uvicorn main:app --reload
 ```
+
+## 오류
+
+**CORS 오류 발생의 경우 다음 이미지를 참조하여 세팅 값을 적절히 설정해야 합니다.:**  
+
+![CorsSettings](./docs/images/cors_settings.png)
