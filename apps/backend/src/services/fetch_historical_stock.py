@@ -91,7 +91,8 @@ class HistoricalStockDataQueryService:
                 (stock_unique_id,)
             )
             description = cursor.description or []
-            columns = [desc[0] for desc in description]
+            columns = [desc[0] 
+                       for desc in description]
             rows = cursor.fetchall()
 
         return self._normalize_rows(columns, rows)
