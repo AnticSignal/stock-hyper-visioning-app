@@ -1,4 +1,4 @@
-"""실시간 주식 데이터를 캐시합니다.
+"""실시간 주식 데이터를 Redis에 접속하여 캐시합니다.
 """
 from typing import Optional
 from antic_extensions import RedisService
@@ -10,7 +10,7 @@ __all__ = (
 )
 
 class RealtimeStockInfoCacheService:
-    """실시간 주식 데이터를 Redis로 부터 캐시한다.
+    """실시간 주식 데이터를 Redis로 부터 캐시한다. 
     """
     def __init__(self, redis_service: Optional[RedisService]=None) -> None:
         """실시간 주식 데이터를 Redis로 부터 캐시하는 헬퍼 클래스를 생성.  
@@ -20,8 +20,10 @@ class RealtimeStockInfoCacheService:
             ...
 
         Args:
-            redis_service (RedisService, optional): redis_service 입력할 경우 해당 REDIS 연결 풀을 이용합니다.
+            redis_service (RedisService, optional): redis_service 입력할 경우 해당 REDIS 연결 풀을 이용합니다. 
                                         `None`으로 미기입시 자동으로 내부적으로 새로운 연결 풀을 생성합니다. 
+                                        이때 ``settings.api_settings``의 설정 값에 따라 자동으로 생성합니다. 
+                                        (`REDIS_HOST`, `REDIS_PORT`... 등)   
         """
         if api_settings.REDIS_PASSWORD is None:
             raise EnvironmentError("REDIS_PASSWORD is not provided.")
