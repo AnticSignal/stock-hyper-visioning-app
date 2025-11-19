@@ -1,11 +1,11 @@
 """실시간 주식 데이터를 Redis에 접속하여 캐시합니다.
 """
 import json
-import pprint
-from typing import Optional
+from typing import Optional, Any
 from antic_extensions import RedisService
 from .schema_enums import (
     REDIS_STOCK_CURRENT_PRICE,
+    REDIS_STOCK_INVESTOR_TRADE_DAILY,
     REDIS_STOCK_TOP_10
 )
 from ..settings import api_settings
@@ -71,7 +71,9 @@ class RealtimeStockInfoCacheService:
         :param stock_unique_id: (str) 주식 종목 코드 입력.  
 
         """
-        FILTER_TARGETS = (
+       
+
+        FILTER_TARGETS_CURRENT_PRICE = (
             "hts_kor_isnm", "stck_shrn_iscd", "rprs_mrkt_kor_name",
             "bstp_kor_isnm", "stck_prpr", "prdy_vrss_sign",
             "prdy_vrss", "prdy_ctrt", "stck_oprc",
@@ -79,20 +81,54 @@ class RealtimeStockInfoCacheService:
             "acml_vol", "acml_tr_pbmn", "w52_hgpr",
             "w52_lwpr"
         )
-        data = None
+
+        data_price: Optional[dict[str, Any]] = None
         try:
-            data = self.redis_client.get(
+            data_price = self.redis_client.get(
                 REDIS_STOCK_CURRENT_PRICE.format(id=stock_unique_id)
             )
-            data = json.loads(data) # type: ignore
+            data_price = json.loads(data_price) # type: ignore    
         except TypeError as e:
             logging.warning(e)
         except Exception as e:
             logging.error(e)
-        if isinstance(data, dict):
+        if isinstance(data_price, dict):
             # 필터링
-            data = {k: v 
-                    for k, v in data.items()
-                    if k in FILTER_TARGETS}
-        return data
+            data_price = {k: v 
+                    for k, v in data_price.items()
+                    if k in FILTER_TARGETS_CURRENT_PRICE}
+        else:
+            data_price = {}
+        
+        FILTER_TARGETS_INVESTOR_TRADE = (
+            "frgn_ntby_qty", "prsn_ntby_qty", "orgn_ntby_qty"
+        )
 
+        data_investor: Optional[dict[str, Any]] = None
+        try:
+            data_investor = self.redis_client.get(
+                REDIS_STOCK_INVESTOR_TRADE_DAILY.format(id=stock_unique_id)
+            )
+            decoded = json.loads(data_investor) # type: ignore  
+            if isinstance(decoded, list) and decoded:
+                data_investor = decoded[0]
+            elif isinstance(decoded, dict):
+                data_investor = decoded
+            else:
+                data_investor = {}
+        except TypeError as e:
+            logging.warning(e)
+        except Exception as e:
+            logging.error(e)
+        if isinstance(data_investor, dict):
+            # 필터링
+            data_investor = {k: v 
+                    for k, v in data_investor.items()
+                    if k in FILTER_TARGETS_INVESTOR_TRADE}
+        else:
+            data_investor = {}
+
+        data = { **data_price, **data_investor}
+
+
+        return data

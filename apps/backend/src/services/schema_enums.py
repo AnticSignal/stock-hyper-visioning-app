@@ -5,6 +5,9 @@
 REDIS_STOCK_CURRENT_PRICE       = "stock:{id}:current_price"
 '''주식 현재 가격'''
 
+REDIS_STOCK_INVESTOR_TRADE_DAILY= "stock:{id}:investor_trade_daily"
+'''투자자 매매 동향(실시간)'''
+
 # REDIS_STOCK_CURRENT_PRICE_FIELD = "stock:{id}:current_price_fields"     # Hash
 # '''주식 현재 가격 필드'''
 
