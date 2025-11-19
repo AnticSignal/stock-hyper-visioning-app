@@ -5,7 +5,10 @@ from typing import Optional, Any
 from antic_extensions import RedisService
 from .schema_enums import (
     REDIS_STOCK_CURRENT_PRICE,
+<<<<<<< HEAD
     REDIS_STOCK_INVESTOR_TRADE_DAILY,
+=======
+>>>>>>> msteam/main
     REDIS_STOCK_TOP_10
 )
 from ..settings import api_settings
